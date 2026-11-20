@@ -2782,7 +2782,7 @@ function renderInstall(){
   if(standalone())t.textContent='Installed. You’re using the app.';
   else if(installEvt){t.textContent='Put it on your home screen: it opens full-screen and works offline.';b.hidden=false;}
   else if(isIOS)t.textContent='On iPhone or iPad: open this page in Safari, tap Share (the square with an arrow), then “Add to Home Screen”.';
-  else t.textContent='To install, open lighting8282.github.io/chiya-pasal in Chrome or Edge and choose “Install app” from the menu. On iPhone: Safari → Share → Add to Home Screen.';
+  else t.textContent='To install, open lighting8282.github.io/chiya-pasal-adult in Chrome or Edge and choose “Install app” from the menu. On iPhone: Safari → Share → Add to Home Screen.';
 }
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;renderInstall();});
 addEventListener('appinstalled',()=>{installEvt=null;renderInstall();});

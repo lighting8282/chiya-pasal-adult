@@ -1,7 +1,9 @@
 // Offline support for the installed Chiya Pasal app.
 // Pages: network first (so updates arrive as soon as you're online), cached copy when offline.
 // Icons and other files: cache first. Google Fonts: served from cache, refreshed in the background.
-const VERSION = 'chiya-pasal-v1';
+// Cache names are shared by every project site on lighting8282.github.io, so this game only ever touches its own.
+const PREFIX = 'chiya-pasal-adult-';
+const VERSION = PREFIX + 'v1';
 const CORE = ['./', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
@@ -11,7 +13,7 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== 'fonts').map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== VERSION).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
