@@ -133,6 +133,8 @@ Spend your rupees in the **Bazaar** (from the home screen or the day summary):
 
 - New vocabulary comes in over six days: numbers, foods, counting words (*cup, gilas, plate, wota*), polite phrases, and on day 6 the weather. Each day opens with a card of the new words. Day 7 onward is review.
 - Every word has a mastery level (0 to 5). Correct answers without peeking raise it, mistakes lower it, and weaker words show up more often.
+- **Review scheduling.** Every word you have met is also scheduled for review: after a right answer it comes back in 1, 3, 7, 14, then 30 days; after a miss it drops two stages and returns tomorrow. A word advances at most once a day, so repeating it ten times in one sitting is not counted as ten reviews. Words due today are asked about a little more often at the stall, appear as a **Review** card on the home screen, and have their own flashcard deck ("Dohoryaunus"). Progress saved before this existed is scheduled from its mastery level.
+- **Backup and restore.** Progress lives only in the browser, so Settings has **Save a backup** (downloads every player, their progress and the theme as one JSON file) and **Restore from a file**. A restore validates the file, asks before replacing anything, and keeps what was on the device so **Undo last restore** can bring it back. The home screen suggests a backup once there is progress worth keeping, and again every two weeks.
 - The **Shabdakosh** (dictionary) lists every unlocked word with its mastery.
 - **Settings** has a Relaxed mode (no patience timer) and a Show English mode.
 - Progress is saved in the browser's `localStorage`.

@@ -427,6 +427,11 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 .tblwrap{overflow-x:auto}
 .set-install{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;background:var(--surface-2);border-radius:10px;padding:8px 12px;font-size:.92rem}
 .set-install span{flex:1 1 240px;color:var(--muted)}
+.hrev{background:var(--surface-2);color:var(--ink);border:2px solid var(--crimson);border-bottom-width:6px}
+.set-backup{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:.92rem}
+.set-backup #backupText{color:var(--muted)}
+.set-backup .restore-ask{background:var(--surface);border:2px solid var(--crimson);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:.95rem}
+.set-backup .restore-ask p{margin:0 0 8px}
 .set-speed{display:flex;flex-direction:column;gap:6px;padding-left:28px;font-size:.95rem}
 .sumgrid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:520px){.sumgrid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -584,6 +589,12 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
   </div>
   <div class="set-speed"><b>Voice speed</b>
     <div class="speeds" id="speeds" role="radiogroup" aria-label="Voice speed"></div>
+  </div>
+  <div class="set-backup" id="backupBox"><b>💾 Your progress</b>
+    <span id="backupText"></span>
+    <div class="row-end" style="justify-content:flex-start;margin:0"><button class="ghost" id="btnBackup" type="button">Save a backup</button><button class="ghost" id="btnRestore" type="button">Restore from a file…</button><button class="ghost" id="btnUndo" type="button" hidden>Undo last restore</button></div>
+    <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+    <div id="restoreMsg" class="recap" role="status" aria-live="polite"></div>
   </div>
   <div class="set-install" id="installBox"><b>📱 App</b> <span id="installText"></span> <button class="primary" id="installBtn" type="button" hidden>Install Chiya Pasal</button></div>
   <div class="row-end" style="justify-content:space-between">
@@ -838,7 +849,14 @@ const fmt=n=>'रु '+n.toLocaleString('en-IN');
 
 // ---------- persistence ----------
 const KEY='chiya-pasal-v1';
-const fresh=()=>({day:1,rupees:0,mastery:{},settings:{relaxed:false,english:false,voice:true,rate:0.9,voiceName:'',typing:false,listen:false,mic:false}});
+// today's date on this device's calendar (YYYY-MM-DD), and the date some days from another date
+const today=()=>new Date().toLocaleDateString('en-CA');
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('en-CA');};
+// Review scheduling. Every word a player has met sits at a stage from 0 to 5, and comes due again after INTERVALS[stage] days.
+// A right answer moves it up a stage, but only once a day (so practising a word ten times in one sitting doesn't count as
+// ten reviews); a wrong answer drops it two stages and brings it back tomorrow. Saved per player as S.rev[word] = {n, due, last}.
+const INTERVALS=[0,1,3,7,14,30];
+const fresh=()=>({day:1,rupees:0,mastery:{},rev:{},settings:{relaxed:false,english:false,voice:true,rate:0.9,voiceName:'',typing:false,listen:false,mic:false}});
 // ---------- players ----------
 // The player list lives under its own key; each player's progress is a separate saved state.
 // The first player ("p1") keeps the original key, so progress from before players existed is kept.
@@ -854,6 +872,9 @@ const curProf=()=>PR.list.find(p=>p.id===PR.cur)||PR.list[0];
 function loadState(id){
   let s;try{s=JSON.parse(localStorage.getItem(profKey(id)))||fresh();}catch(e){s=fresh();}
   s.settings=Object.assign({relaxed:false,english:false,voice:true,rate:0.9,voiceName:'',typing:false,listen:false,mic:false},s.settings||{});s.mastery=s.mastery||{};
+  // progress from before review dates existed: each word it has met is scheduled from its mastery (a weak word is due now, a strong one later)
+  s.rev=s.rev||{};
+  for(const k in s.mastery)if(!s.rev[k]){const n=Math.min(5,Math.max(0,s.mastery[k]|0));s.rev[k]={n,due:addDays(today(),INTERVALS[n]),last:''};}
   return s;
 }
 let S=loadState(PR.cur);
@@ -912,7 +933,20 @@ function speakDev(dev){
 
 const E=()=>Math.min(S.day,5);
 const lvl=t=>S.mastery[t]||0;
-const need=t=>DICT[t]&&DICT[t].day>0?6-lvl(t):1;
+const isDue=t=>{const r=S.rev&&S.rev[t];return !!r&&r.due<=today();};
+// a word due for review is asked for a little more often at the stall
+const need=t=>DICT[t]&&DICT[t].day>0?(6-lvl(t))*(isDue(t)?1.5:1):1;
+const dueWords=()=>VOCAB.filter(v=>v[3]>0&&isDue(v[0])).sort((a,b)=>S.rev[a[0]].due.localeCompare(S.rev[b[0]].due)||lvl(a[0])-lvl(b[0]));
+// an answer for a word: mastery (what the stall uses to choose words) and its review date
+function grade(t,ok){
+  if(!(DICT[t]&&DICT[t].day>0))return;
+  S.mastery[t]=ok?Math.min(5,lvl(t)+1):Math.max(0,lvl(t)-1);
+  const r=S.rev[t]||(S.rev[t]={n:0,due:today(),last:''});
+  if(ok){if(r.last!==today()){r.n=Math.min(5,r.n+1);r.due=addDays(today(),INTERVALS[r.n]);r.last=today();}}
+  else{r.n=Math.max(0,r.n-2);r.due=addDays(today(),1);r.last=today();}
+}
+// a word seen with a hint: it counts as met, and comes back tomorrow
+function touch(t){if(DICT[t]&&DICT[t].day>0&&!S.rev[t])S.rev[t]={n:0,due:addDays(today(),1),last:today()};}
 const avgNeed=ts=>{const k=ts.filter(t=>DICT[t]&&DICT[t].day>0);return k.length?k.reduce((a,t)=>a+need(t),0)/k.length:1;};
 const owns=id=>!!(S.shop&&S.shop.owned&&S.shop.owned[id]);
 const unlocked=()=>Object.keys(ITEMS).filter(k=>ITEMS[k].day<=E()&&(!ITEMS[k].shop||owns(k)));
@@ -1763,8 +1797,11 @@ function cardDecksEn(){
    {id:'en-days',group:'Practice',np:'Days of the week',en:'Sunday to Saturday',icon:'🕒',cards:()=>DAYS.map(x=>({f:x[2],dev:'',b:x[1]}))}];
   WORD_TOPICS.forEach(t=>D.push({id:'en-vis-'+t.id,group:'Picture topics',np:t.en,en:t.dev,icon:t.icon,cards:()=>t.items.map(it=>({f:cap(it[1]),dev:'',b:toDev(it[0]),
     pic:t.q==='rang'?`<span class="wd-swatch" style="background:${it[2]}"></span>`:it[2]}))}));
-  return D;
+  D.push({id:'due',group:'For you',np:'Review',en:'Words due for review today',icon:'🔁',cards:()=>dueWords().slice(0,25).map(v=>({k:v[0],f:v[1],dev:'',b:v[2]}))});
+  return forYouFirst(D);
 }
+// the decks made for this player (review, missed words) come first
+const forYouFirst=D=>[...D.filter(d=>d.group==='For you'),...D.filter(d=>d.group!=='For you')];
 function cardDecks(){
   if(EN())return cardDecksEn();
   const D=[];
@@ -1779,20 +1816,22 @@ function cardDecks(){
     pic:t.q==='rang'?`<span class="wd-swatch" style="background:${it[2]}"></span>`:it[2]}))}));
   GRAMMAR.forEach(g=>D.push({id:'gram-'+g.id,group:'Vyakaran',np:g.np,en:g.en,icon:g.icon,cards:()=>[...g.examples,...g.build,...g.drill.map(d=>[d[0].replace('___',d[2]),d[1].replace(/ \([^)]*\)$/,'')])]
     .filter((x,i,a)=>a.findIndex(y=>y[0]===x[0])===i).map(x=>({f:x[0],dev:toDev(x[0]),b:x[1]}))}));
+  D.push({id:'due',group:'For you',np:'Dohoryaunus',en:'Words due for review today',icon:'🔁',cards:()=>dueWords().slice(0,25).map(vocabCard)});
   D.push({id:'weak',group:'For you',np:'Kamjor shabda',en:'Words you keep missing',icon:'🎯',cards:()=>VOCAB.filter(v=>v[3]>0&&v[0] in S.mastery&&lvl(v[0])<=1).map(vocabCard)});
-  return D;
+  return forYouFirst(D);
 }
 function openCards(){
   const decks=cardDecks(),groups=[...new Set(decks.map(d=>d.group))];
   practiceSheet(EN()?'Flashcards':'Patti',EN()?'<span lang="ne">पत्ती</span>':'flashcards',`<p>Flip through a deck: see the ${EN()?'English':'Nepali'}, guess the meaning, flip to check. Cards you miss come back until you know them.</p>
    ${groups.map(gr=>`<h3>${gr}</h3><div class="prac">${decks.filter(d=>d.group===gr).map(d=>{const n=d.cards().length;
-     return `<button data-d="${d.id}" ${n?'':'disabled'}><span class="pi" aria-hidden="true">${d.icon}</span><b>${esc(d.np)}</b><small>${esc(d.en)} · ${n} card${n===1?'':'s'}${!n&&d.id==='weak'?' (none yet)':''}</small></button>`;}).join('')}</div>`).join('')}`);
+     return `<button data-d="${d.id}" ${n?'':'disabled'}><span class="pi" aria-hidden="true">${d.icon}</span><b>${esc(d.np)}</b><small>${esc(d.en)} · ${n} card${n===1?'':'s'}${!n&&d.id==='weak'?' (none yet)':!n&&d.id==='due'?' (nothing due today)':''}</small></button>`;}).join('')}</div>`).join('')}`);
   $('#introBody').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>startCards(decks.find(d=>d.id===b.dataset.d),openCards));
 }
 let FC=null;
 function startCards(deck,back){
   const cards=deck.cards();
   S.practiced=S.practiced||{};S.practiced.patti=true;save();
+  show('#ovIntro');
   FC={deck,back,queue:shuffle(cards),total:cards.length,known:0,missed:new Set(),flipped:false,rev:!!S.settings.cardsRev};
   drawCard();
 }
@@ -1802,6 +1841,7 @@ function drawCard(){
     const again=[...FC.missed];
     $('#introBody').innerHTML=`<h2>Sakiyo!<small>${esc(FC.deck.np)} · ${esc(FC.deck.en)}</small></h2>
      <div class="sumgrid"><div><b>${FC.total}</b><span>cards</span></div><div><b>${FC.total-again.length}</b><span>knew first time</span></div><div><b>${again.length}</b><span>needed again</span></div></div>
+     ${FC.deck.id==='due'?'<p class="recap">Words you got right come back in 1 to 30 days, the better you know them. Words you missed come back tomorrow.</p>':''}
      <div class="row-end">${again.length?'<button class="ghost" id="fcMissed">Just the missed ones</button>':''}<button class="ghost" id="fcAgain">Whole deck again</button><button class="primary" id="fcBack">Done</button></div>`;
     if(again.length)$('#fcMissed').onclick=()=>{const d={...FC.deck,cards:()=>again};startCards(d,FC.back);};
     $('#fcAgain').onclick=()=>startCards(FC.deck,FC.back);
@@ -1829,7 +1869,7 @@ function drawCard(){
 }
 function cardDone(ok){
   const c=FC.queue.shift(),first=!FC.missed.has(c);
-  if(c.k&&DICT[c.k]&&DICT[c.k].day>0&&first){S.mastery[c.k]=ok?Math.min(5,lvl(c.k)+1):Math.max(0,lvl(c.k)-1);save();}
+  if(c.k&&first){grade(c.k,ok);save();}
   if(!ok){FC.missed.add(c);FC.queue.splice(Math.min(3,FC.queue.length),0,c);}
   FC.flipped=false;drawCard();
 }
@@ -2235,8 +2275,8 @@ function score(st,ok){
   if(st.scored)return;st.scored=true;
   const keys=[...toks(st.npSay||st.say),...(st.answer?toks(st.npAns||st.answer.t):[])].filter(t=>DICT[t]&&DICT[t].day>0);
   G.steps++;markActive();
-  if(ok){G.correct++;if(!st.hinted)keys.forEach(t=>S.mastery[t]=Math.min(5,lvl(t)+1));C.patience=Math.min(100,C.patience+15);}
-  else{C.mistakes++;keys.forEach(t=>{S.mastery[t]=Math.max(0,lvl(t)-1);G.missed.add(t);});}
+  if(ok){G.correct++;keys.forEach(t=>st.hinted?touch(t):grade(t,true));C.patience=Math.min(100,C.patience+15);}
+  else{C.mistakes++;keys.forEach(t=>{grade(t,false);G.missed.add(t);});}
   save();
 }
 function praise(){const p=rnd(PRAISE);return EN()?`<b>${p[1]}</b> <span class="recap">(${p[0]})</span>`:`<b>${p[0]}</b> <span class="recap">(${p[1]})</span>`;}
@@ -2502,6 +2542,7 @@ function goHome(){
   const nb=nextBuy();
   if(nb&&nb.can)sug.push({icon:'🛍️',t:`You can buy: ${nb.it.en}`,s:`${fmt(nb.it.price)} in the Bazaar · you have ${fmt(S.rupees)}`,go:()=>openShop()});
   const en=EN();
+  const due=dueWords().length;
   const li=LIPI.findIndex((_,i)=>!(((S.lipi||{best:{}}).best[i]||0)>=80));
   if(li>=0&&!en)sug.push({icon:'अ',t:`Lipi lesson ${li+1}: ${LIPI[li].np}`,s:LIPI[li].title,go:()=>openLipiLesson(li)});
   const gi=GRAMMAR.findIndex(g=>!((((S.gram||{}).best||{})[g.id]||0)>=80));
@@ -2510,6 +2551,7 @@ function goHome(){
   if(weak&&!en)sug.push({icon:'🎯',t:`${weak} word${weak===1?'':'s'} to practise`,s:'Flashcards of the words you keep missing',go:()=>startCards(cardDecks().find(d=>d.id==='weak'),openCards)});
   const untried=practices().find(x=>!((S.practiced||{})[x.key]||{mausam:S.wxPlayed,pariwar:S.famPlayed,vishaya:S.wordsPlayed}[x.key]));
   if(untried)sug.push({icon:untried.icon,t:`Try ${en?untried.en:untried.np}`,s:en?EN_ABOUT[untried.key]||untried.about:untried.en+'. '+untried.about,go:untried.open});
+  if(backupDue())sug.unshift({icon:'💾',t:'Save a backup of your progress',s:PR.backup&&PR.backup.last?`Your last backup was ${daysAgo(PR.backup.last)}`:'Your progress lives only in this browser',go:()=>{$('#btnSet').click();setTimeout(()=>$('#backupBox').scrollIntoView({block:'center'}),60);}});
   const greet=new Date().getHours()<12?['Shubha prabhat','Good morning']:new Date().getHours()<18?['Namaste','Hello']:['Shubha sandhya','Good evening'];
   $('#home').innerHTML=`
    <section class="hero">${avatarHtml(p,'big')}
@@ -2524,6 +2566,7 @@ function goHome(){
      <div><b>${lipiDone}/${LIPI.length} · ${gramDone}/${GRAMMAR.length}</b><span>script · grammar lessons</span></div>`}
    </section>
    <button class="hmain" id="hStall" type="button"><span class="hm-ic" aria-hidden="true">🍵</span><span><b>${en?'Open the tea stall':'Pasal kholnus'}</b><small>${en?`<span lang="ne">पसल खोल्नुस्</span> · Day ${S.day}`:`Open the tea stall · Day ${S.day}`}</small></span><span class="hm-go" aria-hidden="true">→</span></button>
+   ${due?`<button class="hmain hrev" id="hReview" type="button"><span class="hm-ic" aria-hidden="true">🔁</span><span><b>${en?'Review':'Dohoryaunus'}</b><small>${due} word${due===1?'':'s'} due today · flashcards</small></span><span class="hm-go" aria-hidden="true">→</span></button>`:''}
    <section class="hgrid">
      ${(en?[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Practice','Practice rounds'],['hCards','🃏','Flashcards','English phrases and words'],['hSet','⚙️','Settings','Voice, answers, app']]
        :[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Abhyas','Practice rounds'],['hCards','🃏','Patti','Flashcards'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script'],['hBook','📖','Shabdakosh','Your dictionary'],['hSet','⚙️','Settings','Voice, answers, app']])
@@ -2532,6 +2575,7 @@ function goHome(){
    ${sug.length?`<h2 class="hsub">Aaja ko lagi <small>suggested for today</small></h2><section class="hsug">${sug.slice(0,3).map((x,i)=>`<button type="button" data-s="${i}"><span class="hc-ic" aria-hidden="true">${x.icon}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></button>`).join('')}</section>`:''}`;
   $('#hWho').onclick=()=>openWho();
   $('#hStall').onclick=()=>startDay();
+  if($('#hReview'))$('#hReview').onclick=()=>startCards(cardDecks().find(d=>d.id==='due'),goHome);
   $('#hShop').onclick=()=>openShop();
   $('#hPrac').onclick=openPractice;$('#hCards').onclick=openCards;
   if(!en){$('#hGram').onclick=openGrammar;$('#hLipi').onclick=openLipiIntro;$('#hBook').onclick=()=>{renderBook();show('#ovBook');};}
@@ -2805,6 +2849,93 @@ $('#closeSet').onclick=()=>{
   document.querySelectorAll('.opt .en').forEach(e=>{if(S.settings.english)e.hidden=false;});
 };
 let resetArm=false;
+// ---------- backup and restore ----------
+// Everything is saved in this browser, so a backup file is the safety net: every player, their progress, and the theme.
+// Restoring replaces what is on this device; the progress it replaces is kept first, so a restore can be undone.
+const BACKUP_FORMAT=1,UNDO_KEY='chiya-pasal-undo',THEME_STORE='chiya-pasal-theme';
+const niceDate=d=>new Date(d+'T12:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+const daysAgo=d=>{const n=Math.round((new Date(today()+'T12:00:00')-new Date(d+'T12:00:00'))/864e5);return n<=0?'today':n===1?'yesterday':n+' days ago';};
+// worth suggesting once there is progress worth keeping: never saved, or not for two weeks
+function backupDue(){
+  if(!(Object.keys(S.mastery||{}).length>=15||S.day>=3))return false;
+  const b=PR.backup||{};
+  return !b.last||(new Date(today()+'T12:00:00')-new Date(b.last+'T12:00:00'))/864e5>=14;
+}
+function backupData(){
+  save();
+  const states={};
+  PR.list.forEach(p=>{try{const raw=localStorage.getItem(profKey(p.id));if(raw)states[p.id]=JSON.parse(raw);}catch(e){}});
+  let theme='';try{theme=localStorage.getItem(THEME_STORE)||'';}catch(e){}
+  return {app:'chiya-pasal',format:BACKUP_FORMAT,saved:new Date().toISOString(),profiles:PR,states,theme};
+}
+function downloadText(name,text){
+  const u=URL.createObjectURL(new Blob([text],{type:'application/json'})),a=document.createElement('a');
+  a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);
+}
+// read a backup file's text: {error} or {data} with a tidied player list and a one-line summary
+function checkBackup(text){
+  if(text.length>8e6)return {error:'That file is too big to be a Chiya Pasal backup.'};
+  let b;try{b=JSON.parse(text);}catch(e){return {error:'That file isn’t a backup: it can’t be read.'};}
+  if(!b||b.app!=='chiya-pasal'||!b.profiles||!Array.isArray(b.profiles.list)||!b.profiles.list.length||!b.states||typeof b.states!=='object')return {error:'That file isn’t a Chiya Pasal backup.'};
+  if(b.format>BACKUP_FORMAT)return {error:'That backup is from a newer version of the game. Update the game, then try again.'};
+  const list=[];
+  for(const p of b.profiles.list.slice(0,20)){
+    if(!p||typeof p.id!=='string'||!/^[A-Za-z0-9_-]{1,40}$/.test(p.id))return {error:'The backup’s player list is damaged.'};
+    const st=b.states[p.id];
+    if(st!==undefined&&(!st||typeof st!=='object'||typeof st.day!=='number'||(st.mastery&&typeof st.mastery!=='object')))return {error:'The backup has damaged progress for '+String(p.name||'a player').slice(0,30)+'.'};
+    list.push({...p,id:p.id,name:String(p.name||'Player').slice(0,30),av:String(p.av||'🦊').slice(0,8),
+      color:/^#[0-9a-f]{3,8}$/i.test(p.color||'')?p.color:AV_COLORS[0],
+      photo:/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p.photo||'')?p.photo:''});
+  }
+  const cur=list.some(p=>p.id===b.profiles.cur)?b.profiles.cur:list[0].id;
+  const data={...b,profiles:{...b.profiles,list,cur}};
+  const names=list.map(p=>p.name).join(', ');
+  const when=b.saved?new Date(b.saved).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'an unknown date';
+  return {data,summary:`${list.length} player${list.length===1?'':'s'} (${names}), saved ${when}`};
+}
+// write a checked backup over everything on this device, keeping what was here so it can be undone, then reload
+function applyBackup(b){
+  try{localStorage.setItem(UNDO_KEY,JSON.stringify(backupData()));}catch(e){}
+  try{
+    Object.keys(localStorage).filter(k=>k===KEY||k.startsWith(KEY+':')).forEach(k=>localStorage.removeItem(k));
+    localStorage.setItem(PKEY,JSON.stringify(b.profiles));
+    for(const id in b.states)localStorage.setItem(profKey(id),JSON.stringify(b.states[id]));
+    if(b.theme==='light'||b.theme==='dark')localStorage.setItem(THEME_STORE,b.theme);else localStorage.removeItem(THEME_STORE);
+  }catch(e){renderBackup('Couldn’t restore: this browser wouldn’t save it. Nothing was changed that you can’t undo.');return;}
+  location.reload();
+}
+function askRestore(b,summary,label){
+  $('#restoreMsg').innerHTML=`<div class="restore-ask"><p><b>${label}</b> ${esc(summary)}.</p><p>This replaces everything saved on this device now. What is here now is kept first, so you can undo it.</p>
+    <div class="row-end" style="justify-content:flex-start;margin:0"><button class="danger" id="rsYes" type="button">Replace everything</button><button class="ghost" id="rsNo" type="button">Cancel</button></div></div>`;
+  $('#rsYes').onclick=()=>applyBackup(b);$('#rsNo').onclick=()=>renderBackup();$('#rsNo').focus();
+}
+function renderBackup(msg){
+  const b=PR.backup||{};
+  $('#backupText').textContent=b.last?`Last backup: ${niceDate(b.last)} (${daysAgo(b.last)}). Your progress is saved only in this browser, so keep a copy somewhere safe.`:'No backup yet. Your progress is saved only in this browser, so a backup protects you if its data is cleared or you change phones.';
+  $('#btnUndo').hidden=!localStorage.getItem(UNDO_KEY);
+  $('#restoreMsg').innerHTML=msg?esc(msg):'';
+}
+$('#btnBackup').onclick=()=>{
+  PR.backup={last:today(),n:((PR.backup&&PR.backup.n)||0)+1};saveProfiles();
+  downloadText(`chiya-pasal-backup-${today()}.json`,JSON.stringify(backupData()));
+  renderBackup('Saved to your downloads. Keep the file somewhere safe: cloud storage, or email it to yourself.');
+};
+$('#btnRestore').onclick=()=>{$('#restoreFile').value='';$('#restoreFile').click();};
+$('#restoreFile').onchange=e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{const c=checkBackup(String(r.result));if(c.error){renderBackup(c.error);return;}askRestore(c.data,c.summary,'Restore this backup?');};
+  r.onerror=()=>renderBackup('That file couldn’t be read.');
+  r.readAsText(f);
+};
+$('#btnUndo').onclick=()=>{
+  let raw;try{raw=localStorage.getItem(UNDO_KEY);}catch(e){}
+  const c=raw?checkBackup(raw):{error:'There is nothing to undo.'};
+  if(c.error){renderBackup(c.error);return;}askRestore(c.data,c.summary,'Go back to what you had before the last restore?');
+};
+// opening Settings refreshes the backup box
+{const open=$('#btnSet').onclick;$('#btnSet').onclick=()=>{open();renderBackup();};}
+
 $('#btnReset').onclick=()=>{
   if(!resetArm){resetArm=true;$('#btnReset').textContent='Tap again to erase everything';return;}
   S=fresh();save();hide('#ovSet');goHome();
