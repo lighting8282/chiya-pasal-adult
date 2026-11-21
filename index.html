@@ -67,7 +67,9 @@ try{const t=localStorage.getItem('chiya-pasal-theme');if(t==='light'||t==='dark'
 [hidden]{display:none!important}
 html,body{height:100%}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+html[data-text="l"]{font-size:118%}
+html[data-text="xl"]{font-size:137%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1rem;line-height:1.45}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .app{max-width:1000px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 28px;display:flex;flex-direction:column;gap:12px}
@@ -428,6 +430,27 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 .set-install{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;background:var(--surface-2);border-radius:10px;padding:8px 12px;font-size:.92rem}
 .set-install span{flex:1 1 240px;color:var(--muted)}
 .hrev{background:var(--surface-2);color:var(--ink);border:2px solid var(--crimson);border-bottom-width:6px}
+.today{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center;background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:14px;margin:12px 0}
+.today .ring{position:relative;width:76px;height:76px}
+.today .ring svg{width:100%;height:100%}
+.today .ring circle{fill:none;stroke-width:5}
+.today .ring .rb{stroke:var(--line)}
+.today .ring .rf{stroke:var(--crimson);stroke-linecap:round;transition:stroke-dasharray .6s}
+.today .ring span{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.82rem;color:var(--muted);line-height:1}
+.today .ring span b{font-size:1.5rem;color:var(--ink);font-variant-numeric:tabular-nums}
+.today-t b{font-size:1.15rem;display:block}
+.today-t small{color:var(--muted);display:block;font-size:.9rem}
+.wk{display:flex;gap:5px;margin-top:6px}
+.wk .dot{width:24px;height:24px;border-radius:50%;background:var(--surface-2);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--muted)}
+.wk .dot.on{background:var(--crimson);border-color:var(--crimson);color:var(--on-crimson);font-weight:700}
+.wk .dot.now{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--muted)}
+.today #hQuick{grid-column:1/-1;padding:12px 20px}
+.goalpick{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:var(--muted);font-size:.9rem}
+.goalpick button{background:var(--surface-2);border:2px solid var(--line);border-radius:99px;padding:3px 12px}
+.goalpick button[aria-checked="true"]{border-color:var(--crimson);background:var(--surface);color:var(--ink);font-weight:700}
+.goal-line{font-weight:700;margin:6px 0}
+#goalToast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,40px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:99px;padding:10px 18px;z-index:99;transition:.3s;max-width:92vw;text-align:center}
+#goalToast.show{transform:translate(-50%,0);opacity:1}
 .set-backup{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:.92rem}
 .set-backup #backupText{color:var(--muted)}
 .set-backup .restore-ask{background:var(--surface);border:2px solid var(--crimson);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:.95rem}
@@ -573,6 +596,9 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 <div class="overlay" id="ovBook" hidden><div class="sheet" id="bookBody"></div></div>
 <div class="overlay" id="ovSet" hidden><div class="sheet">
   <h2>Settings</h2>
+  <div class="set-speed set-theme"><b>Text size</b>
+    <div class="speeds" id="sizes" role="radiogroup" aria-label="Text size"></div>
+  </div>
   <div class="set-speed set-theme"><b>Theme</b>
     <div class="speeds" id="themes" role="radiogroup" aria-label="Theme"></div>
   </div>
@@ -849,6 +875,8 @@ const fmt=n=>'रु '+n.toLocaleString('en-IN');
 
 // ---------- persistence ----------
 const KEY='chiya-pasal-v1';
+const TEXT_KEY='chiya-pasal-textsize';
+try{const t=localStorage.getItem(TEXT_KEY);if(t==='l'||t==='xl')document.documentElement.dataset.text=t;}catch(e){}
 // today's date on this device's calendar (YYYY-MM-DD), and the date some days from another date
 const today=()=>new Date().toLocaleDateString('en-CA');
 const addDays=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('en-CA');};
@@ -879,9 +907,32 @@ function loadState(id){
 }
 let S=loadState(PR.cur);
 const save=()=>{try{localStorage.setItem(profKey(PR.cur),JSON.stringify(S));}catch(e){}};
+// Daily goal: the player picks 5, 10 or 20 minutes. Time is counted between answers (a pause longer than 25 seconds counts as 25),
+// so it follows real practice, not a screen left open. Missing a day loses nothing. S.act.hist[date] = {s: seconds, met: 1 once the goal was reached}.
+const goalMin=()=>S.goal||10;
+const todaySecs=()=>((S.act&&S.act.hist[today()])||{s:0}).s;
+let lastAns=0;
+function credit(){
+  markActive();
+  const now=Date.now(),gap=lastAns?Math.min(25,(now-lastAns)/1000):8;lastAns=now;
+  const A=S.act=S.act||{hist:{}},d=today(),h=A.hist[d]||(A.hist[d]={s:0,met:0});
+  h.s+=Math.max(2,gap);
+  const keys=Object.keys(A.hist).sort();while(keys.length>90)delete A.hist[keys.shift()];
+  if(!h.met&&h.s>=goalMin()*60){h.met=1;goalToast();}
+}
+function goalToast(){
+  let t=document.getElementById('goalToast');
+  if(!t){t=document.createElement('div');t.id='goalToast';t.setAttribute('role','status');document.body.append(t);}
+  t.innerHTML='🎉 <b>Daily goal reached!</b> Syabaas. Keep going if you like.';
+  t.className='show';clearTimeout(t._h);t._h=setTimeout(()=>t.className='',5500);
+}
+const goalLine=()=>{const m=Math.floor(todaySecs()/60);return todaySecs()>=goalMin()*60?'Daily goal reached ✓':`Today: ${m} of ${goalMin()} min`;};
+// days of the last week in which the goal was reached
+const weekDots=()=>{let n=0;const dots=[];for(let i=6;i>=0;i--){const d=addDays(today(),-i),h=S.act&&S.act.hist[d],on=!!(h&&h.met);if(on)n++;
+  dots.push(`<span class="dot${on?' on':''}${i===0?' now':''}" title="${niceDate(d)}">${new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'narrow'})}</span>`);}return {n,html:dots.join('')};};
 // days in a row with at least one answer
 function markActive(){
-  const d=new Date(),day=d.toISOString().slice(0,10),y=new Date(d-864e5).toISOString().slice(0,10);
+  const day=today(),y=addDays(day,-1);
   const st=S.streak||{last:'',n:0};
   if(st.last!==day){st.n=st.last===y?st.n+1:1;st.last=day;S.streak=st;}
 }
@@ -1797,10 +1848,18 @@ function cardDecksEn(){
    {id:'en-days',group:'Practice',np:'Days of the week',en:'Sunday to Saturday',icon:'🕒',cards:()=>DAYS.map(x=>({f:x[2],dev:'',b:x[1]}))}];
   WORD_TOPICS.forEach(t=>D.push({id:'en-vis-'+t.id,group:'Picture topics',np:t.en,en:t.dev,icon:t.icon,cards:()=>t.items.map(it=>({f:cap(it[1]),dev:'',b:toDev(it[0]),
     pic:t.q==='rang'?`<span class="wd-swatch" style="background:${it[2]}"></span>`:it[2]}))}));
+  D.push({id:'quick',group:'For you',np:'Quick session',en:'Ten words, about 3 minutes',icon:'⚡',cards:()=>quickWords().map(v=>({k:v[0],f:v[1],dev:'',b:v[2]}))});
   D.push({id:'due',group:'For you',np:'Review',en:'Words due for review today',icon:'🔁',cards:()=>dueWords().slice(0,25).map(v=>({k:v[0],f:v[1],dev:'',b:v[2]}))});
   return forYouFirst(D);
 }
 // the decks made for this player (review, missed words) come first
+const quickWords=()=>{
+  const out=[],seen=new Set(),add=v=>{if(out.length<10&&!seen.has(v[0])){seen.add(v[0]);out.push(v);}};
+  dueWords().forEach(add);
+  VOCAB.filter(v=>v[3]>0&&v[0] in S.mastery).sort((a,b)=>lvl(a[0])-lvl(b[0])).forEach(add);
+  VOCAB.filter(v=>v[3]>0&&v[3]<=S.day&&!(v[0] in S.mastery)).forEach(add);
+  return out;
+};
 const forYouFirst=D=>[...D.filter(d=>d.group==='For you'),...D.filter(d=>d.group!=='For you')];
 function cardDecks(){
   if(EN())return cardDecksEn();
@@ -1816,6 +1875,7 @@ function cardDecks(){
     pic:t.q==='rang'?`<span class="wd-swatch" style="background:${it[2]}"></span>`:it[2]}))}));
   GRAMMAR.forEach(g=>D.push({id:'gram-'+g.id,group:'Vyakaran',np:g.np,en:g.en,icon:g.icon,cards:()=>[...g.examples,...g.build,...g.drill.map(d=>[d[0].replace('___',d[2]),d[1].replace(/ \([^)]*\)$/,'')])]
     .filter((x,i,a)=>a.findIndex(y=>y[0]===x[0])===i).map(x=>({f:x[0],dev:toDev(x[0]),b:x[1]}))}));
+  D.push({id:'quick',group:'For you',np:'Chhito abhyas',en:'Ten words, about 3 minutes',icon:'⚡',cards:()=>quickWords().map(vocabCard)});
   D.push({id:'due',group:'For you',np:'Dohoryaunus',en:'Words due for review today',icon:'🔁',cards:()=>dueWords().slice(0,25).map(vocabCard)});
   D.push({id:'weak',group:'For you',np:'Kamjor shabda',en:'Words you keep missing',icon:'🎯',cards:()=>VOCAB.filter(v=>v[3]>0&&v[0] in S.mastery&&lvl(v[0])<=1).map(vocabCard)});
   return forYouFirst(D);
@@ -1841,6 +1901,7 @@ function drawCard(){
     const again=[...FC.missed];
     $('#introBody').innerHTML=`<h2>Sakiyo!<small>${esc(FC.deck.np)} · ${esc(FC.deck.en)}</small></h2>
      <div class="sumgrid"><div><b>${FC.total}</b><span>cards</span></div><div><b>${FC.total-again.length}</b><span>knew first time</span></div><div><b>${again.length}</b><span>needed again</span></div></div>
+     <p class="goal-line" role="status">${goalLine()}</p>
      ${FC.deck.id==='due'?'<p class="recap">Words you got right come back in 1 to 30 days, the better you know them. Words you missed come back tomorrow.</p>':''}
      <div class="row-end">${again.length?'<button class="ghost" id="fcMissed">Just the missed ones</button>':''}<button class="ghost" id="fcAgain">Whole deck again</button><button class="primary" id="fcBack">Done</button></div>`;
     if(again.length)$('#fcMissed').onclick=()=>{const d={...FC.deck,cards:()=>again};startCards(d,FC.back);};
@@ -1869,7 +1930,8 @@ function drawCard(){
 }
 function cardDone(ok){
   const c=FC.queue.shift(),first=!FC.missed.has(c);
-  if(c.k&&first){grade(c.k,ok);save();}
+  if(c.k&&first){grade(c.k,ok);}
+  if(first){credit();save();}
   if(!ok){FC.missed.add(c);FC.queue.splice(Math.min(3,FC.queue.length),0,c);}
   FC.flipped=false;drawCard();
 }
@@ -2274,7 +2336,7 @@ function renderInputs(st){
 function score(st,ok){
   if(st.scored)return;st.scored=true;
   const keys=[...toks(st.npSay||st.say),...(st.answer?toks(st.npAns||st.answer.t):[])].filter(t=>DICT[t]&&DICT[t].day>0);
-  G.steps++;markActive();
+  G.steps++;credit();
   if(ok){G.correct++;keys.forEach(t=>st.hinted?touch(t):grade(t,true));C.patience=Math.min(100,C.patience+15);}
   else{C.mistakes++;keys.forEach(t=>{grade(t,false);G.missed.add(t);});}
   save();
@@ -2535,14 +2597,14 @@ function goHome(){
   if(TTS)speechSynthesis.cancel();
   $('#game').hidden=true;$('#home').hidden=false;document.body.dataset.mode='home';
   renderTop();
-  const p=curProf(),streak=S.streak&&S.streak.n&&[new Date().toISOString().slice(0,10),new Date(Date.now()-864e5).toISOString().slice(0,10)].includes(S.streak.last)?S.streak.n:0;
+  const p=curProf(),streak=S.streak&&S.streak.n&&[today(),addDays(today(),-1)].includes(S.streak.last)?S.streak.n:0;
   const lipiDone=LIPI.filter((_,i)=>((S.lipi||{best:{}}).best[i]||0)>=80).length,gramDone=GRAMMAR.filter(g=>(((S.gram||{}).best||{})[g.id]||0)>=80).length;
   // suggestions: the next step in each path, plus weak words
   const sug=[];
   const nb=nextBuy();
   if(nb&&nb.can)sug.push({icon:'🛍️',t:`You can buy: ${nb.it.en}`,s:`${fmt(nb.it.price)} in the Bazaar · you have ${fmt(S.rupees)}`,go:()=>openShop()});
   const en=EN();
-  const due=dueWords().length;
+  const due=dueWords().length,week=weekDots();
   const li=LIPI.findIndex((_,i)=>!(((S.lipi||{best:{}}).best[i]||0)>=80));
   if(li>=0&&!en)sug.push({icon:'अ',t:`Lipi lesson ${li+1}: ${LIPI[li].np}`,s:LIPI[li].title,go:()=>openLipiLesson(li)});
   const gi=GRAMMAR.findIndex(g=>!((((S.gram||{}).best||{})[g.id]||0)>=80));
@@ -2557,6 +2619,21 @@ function goHome(){
    <section class="hero">${avatarHtml(p,'big')}
      <div class="hero-t"><h1>${greet[0]}, ${esc(p.name)}!<small>${greet[1]} · ${streak?`🔥 ${streak} day${streak===1?'':'s'} in a row`:en?'Ready for some English?':'Ready for some Nepali?'}</small></h1></div>
      <button class="ghost" id="hWho" type="button">Change player</button></section>
+   <section class="today" aria-label="Today's goal">
+     <div class="ring" role="img" aria-label="${goalLine()}"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="rb" cx="22" cy="22" r="18"/><circle class="rf" cx="22" cy="22" r="18" transform="rotate(-90 22 22)" stroke-dasharray="${(Math.min(1,todaySecs()/(goalMin()*60))*113.1).toFixed(1)} 113.1"/></svg><span><b>${Math.floor(todaySecs()/60)}</b>min</span></div>
+     <div class="today-t"><b>${goalLine()}</b>
+       <small>${todaySecs()>=goalMin()*60?'Keep going whenever you like.':'A little each day adds up.'}</small>
+       <span class="wk" aria-label="${week.n} of the last 7 days with the goal reached">${week.html}</span></div>
+     <button class="primary" id="hQuick" type="button">⚡ ${en?'Quick session':'Chhito abhyas'}<small>10 flashcards · about 3 min</small></button>
+     <div class="goalpick" role="radiogroup" aria-label="Daily goal">Daily goal ${[5,10,20].map(m=>`<button type="button" role="radio" aria-checked="${m===goalMin()}" data-goal="${m}">${m} min</button>`).join('')}</div>
+   </section>
+   <button class="hmain" id="hStall" type="button"><span class="hm-ic" aria-hidden="true">🍵</span><span><b>${en?'Open the tea stall':'Pasal kholnus'}</b><small>${en?`<span lang="ne">पसल खोल्नुस्</span> · Day ${S.day}`:`Open the tea stall · Day ${S.day}`}</small></span><span class="hm-go" aria-hidden="true">→</span></button>
+   ${due?`<button class="hmain hrev" id="hReview" type="button"><span class="hm-ic" aria-hidden="true">🔁</span><span><b>${en?'Review':'Dohoryaunus'}</b><small>${due} word${due===1?'':'s'} due today · flashcards</small></span><span class="hm-go" aria-hidden="true">→</span></button>`:''}
+   ${sug.length?`<h2 class="hsub">Aaja ko lagi <small>suggested for today</small></h2><section class="hsug">${sug.slice(0,3).map((x,i)=>`<button type="button" data-s="${i}"><span class="hc-ic" aria-hidden="true">${x.icon}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></button>`).join('')}</section>`:''}   <section class="hgrid">
+     ${(en?[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Practice','Practice rounds'],['hCards','🃏','Flashcards','English phrases and words'],['hSet','⚙️','Settings','Voice, answers, app']]
+       :[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Abhyas','Practice rounds'],['hCards','🃏','Patti','Flashcards'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script'],['hBook','📖','Shabdakosh','Your dictionary'],['hSet','⚙️','Settings','Voice, answers, app']])
+       .map(([id,ic,np,en])=>`<button class="hcard" id="${id}" type="button"><span class="hc-ic" aria-hidden="true">${ic}</span><b>${np}</b><small>${en}</small></button>`).join('')}
+   </section>
    <section class="hstats">
      <div><b>Din ${S.day}</b><span>at the tea stall</span></div>
      <div><b>${fmt(S.rupees)}</b><span>earned</span></div>
@@ -2564,17 +2641,11 @@ function goHome(){
      <div><b>${S.tipsTotal?fmt(S.tipsTotal):'–'}</b><span>tips earned</span></div>`
      :`<div><b>${wordsKnown()}</b><span>words known well</span></div>
      <div><b>${lipiDone}/${LIPI.length} · ${gramDone}/${GRAMMAR.length}</b><span>script · grammar lessons</span></div>`}
-   </section>
-   <button class="hmain" id="hStall" type="button"><span class="hm-ic" aria-hidden="true">🍵</span><span><b>${en?'Open the tea stall':'Pasal kholnus'}</b><small>${en?`<span lang="ne">पसल खोल्नुस्</span> · Day ${S.day}`:`Open the tea stall · Day ${S.day}`}</small></span><span class="hm-go" aria-hidden="true">→</span></button>
-   ${due?`<button class="hmain hrev" id="hReview" type="button"><span class="hm-ic" aria-hidden="true">🔁</span><span><b>${en?'Review':'Dohoryaunus'}</b><small>${due} word${due===1?'':'s'} due today · flashcards</small></span><span class="hm-go" aria-hidden="true">→</span></button>`:''}
-   <section class="hgrid">
-     ${(en?[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Practice','Practice rounds'],['hCards','🃏','Flashcards','English phrases and words'],['hSet','⚙️','Settings','Voice, answers, app']]
-       :[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Abhyas','Practice rounds'],['hCards','🃏','Patti','Flashcards'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script'],['hBook','📖','Shabdakosh','Your dictionary'],['hSet','⚙️','Settings','Voice, answers, app']])
-       .map(([id,ic,np,en])=>`<button class="hcard" id="${id}" type="button"><span class="hc-ic" aria-hidden="true">${ic}</span><b>${np}</b><small>${en}</small></button>`).join('')}
-   </section>
-   ${sug.length?`<h2 class="hsub">Aaja ko lagi <small>suggested for today</small></h2><section class="hsug">${sug.slice(0,3).map((x,i)=>`<button type="button" data-s="${i}"><span class="hc-ic" aria-hidden="true">${x.icon}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></button>`).join('')}</section>`:''}`;
+   </section>`;
   $('#hWho').onclick=()=>openWho();
   $('#hStall').onclick=()=>startDay();
+  $('#hQuick').onclick=()=>startCards(cardDecks().find(d=>d.id==='quick'),goHome);
+  $('#home').querySelectorAll('[data-goal]').forEach(b=>b.onclick=()=>{S.goal=+b.dataset.goal;save();goHome();});
   if($('#hReview'))$('#hReview').onclick=()=>startCards(cardDecks().find(d=>d.id==='due'),goHome);
   $('#hShop').onclick=()=>openShop();
   $('#hPrac').onclick=openPractice;$('#hCards').onclick=openCards;
@@ -2934,7 +3005,17 @@ $('#btnUndo').onclick=()=>{
   if(c.error){renderBackup(c.error);return;}askRestore(c.data,c.summary,'Go back to what you had before the last restore?');
 };
 // opening Settings refreshes the backup box
-{const open=$('#btnSet').onclick;$('#btnSet').onclick=()=>{open();renderBackup();};}
+const SIZES=[['','Normal',1],['l','Large',1.18],['xl','Extra large',1.37]];
+function renderSizes(){
+  const cur=document.documentElement.dataset.text||'';
+  $('#sizes').innerHTML=SIZES.map(z=>`<button type="button" role="radio" aria-checked="${z[0]===cur}" data-z="${z[0]}"><b style="font-size:${z[2]}rem">Aa</b><small>${z[1]}</small></button>`).join('');
+  $('#sizes').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.z;if(v)document.documentElement.dataset.text=v;else delete document.documentElement.dataset.text;
+    try{if(v)localStorage.setItem(TEXT_KEY,v);else localStorage.removeItem(TEXT_KEY);}catch(e){}
+    renderSizes();
+  });
+}
+{const open=$('#btnSet').onclick;$('#btnSet').onclick=()=>{open();renderBackup();renderSizes();};}
 
 $('#btnReset').onclick=()=>{
   if(!resetArm){resetArm=true;$('#btnReset').textContent='Tap again to erase everything';return;}
