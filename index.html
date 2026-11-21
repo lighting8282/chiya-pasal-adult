@@ -449,8 +449,24 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 .goalpick button{background:var(--surface-2);border:2px solid var(--line);border-radius:99px;padding:3px 12px}
 .goalpick button[aria-checked="true"]{border-color:var(--crimson);background:var(--surface);color:var(--ink);font-weight:700}
 .goal-line{font-weight:700;margin:6px 0}
-#goalToast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,40px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:99px;padding:10px 18px;z-index:99;transition:.3s;max-width:92vw;text-align:center}
+#goalToast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,40px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:18px;padding:10px 18px;z-index:99;transition:.3s;max-width:92vw;text-align:center}
 #goalToast.show{transform:translate(-50%,0);opacity:1}
+.ms-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ms{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border-radius:12px;padding:10px 12px}
+.ms.got{border:2px solid var(--crimson);background:var(--surface)}
+.ms-ic{font-size:1.6rem;line-height:1.1}
+.ms b{display:block}
+.ms small{display:block;color:var(--muted);font-size:.88rem}
+.bar{display:block;height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--crimson)}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.badge{text-align:center;background:var(--surface-2);border-radius:12px;padding:10px 6px;opacity:.55}
+.badge.got{opacity:1;background:var(--surface);border:2px solid var(--crimson)}
+.badge .bi{font-size:1.8rem;display:block}
+.badge b{display:block;font-size:.95rem}
+.badge small{color:var(--muted);font-size:.82rem;display:block}
+.lvl{background:var(--surface-2);border-radius:12px;padding:10px 12px}
+.lvl b{font-size:1.2rem}
 .set-backup{display:flex;flex-direction:column;gap:8px;background:var(--surface-2);border-radius:10px;padding:10px 12px;font-size:.92rem}
 .set-backup #backupText{color:var(--muted)}
 .set-backup .restore-ask{background:var(--surface);border:2px solid var(--crimson);border-radius:10px;padding:10px 12px;color:var(--ink);font-size:.95rem}
@@ -594,6 +610,7 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 <div class="overlay" id="ovIntro" hidden><div class="sheet" id="introBody"></div></div>
 <div class="overlay" id="ovSum" hidden><div class="sheet" id="sumBody"></div></div>
 <div class="overlay" id="ovBook" hidden><div class="sheet" id="bookBody"></div></div>
+<div class="overlay" id="ovRew" hidden><div class="sheet" id="rewBody"></div></div>
 <div class="overlay" id="ovSet" hidden><div class="sheet">
   <h2>Settings</h2>
   <div class="set-speed set-theme"><b>Text size</b>
@@ -918,14 +935,20 @@ function credit(){
   const A=S.act=S.act||{hist:{}},d=today(),h=A.hist[d]||(A.hist[d]={s:0,met:0});
   h.s+=Math.max(2,gap);
   const keys=Object.keys(A.hist).sort();while(keys.length>90)delete A.hist[keys.shift()];
-  if(!h.met&&h.s>=goalMin()*60){h.met=1;goalToast();}
+  S.stats=S.stats||{answers:0};S.stats.answers++;
+  if(!h.met&&h.s>=goalMin()*60){h.met=1;S.goalDays=(S.goalDays||0)+1;goalToast();}
+  checkRewards();
 }
-function goalToast(){
+// small pop-up at the bottom of the screen; lines that arrive together are stacked (first three shown)
+let noticeLines=[];
+function notice(line){
   let t=document.getElementById('goalToast');
   if(!t){t=document.createElement('div');t.id='goalToast';t.setAttribute('role','status');document.body.append(t);}
-  t.innerHTML='🎉 <b>Daily goal reached!</b> Syabaas. Keep going if you like.';
-  t.className='show';clearTimeout(t._h);t._h=setTimeout(()=>t.className='',5500);
+  noticeLines.push(line);
+  t.innerHTML=noticeLines.slice(0,3).join('<br>')+(noticeLines.length>3?`<br>…and ${noticeLines.length-3} more`:'');
+  t.className='show';clearTimeout(t._h);t._h=setTimeout(()=>{t.className='';noticeLines=[];},6500);
 }
+const goalToast=()=>notice('🎉 <b>Daily goal reached!</b> Syabaas. Keep going if you like.');
 const goalLine=()=>{const m=Math.floor(todaySecs()/60);return todaySecs()>=goalMin()*60?'Daily goal reached ✓':`Today: ${m} of ${goalMin()} min`;};
 // days of the last week in which the goal was reached
 const weekDots=()=>{let n=0;const dots=[];for(let i=6;i>=0;i--){const d=addDays(today(),-i),h=S.act&&S.act.hist[d],on=!!(h&&h.met);if(on)n++;
@@ -995,6 +1018,7 @@ function grade(t,ok){
   const r=S.rev[t]||(S.rev[t]={n:0,due:today(),last:''});
   if(ok){if(r.last!==today()){r.n=Math.min(5,r.n+1);r.due=addDays(today(),INTERVALS[r.n]);r.last=today();}}
   else{r.n=Math.max(0,r.n-2);r.due=addDays(today(),1);r.last=today();}
+  checkRewards();
 }
 // a word seen with a hint: it counts as met, and comes back tomorrow
 function touch(t){if(DICT[t]&&DICT[t].day>0&&!S.rev[t])S.rev[t]={n:0,due:addDays(today(),1),last:today()};}
@@ -1899,6 +1923,7 @@ function drawCard(){
   const c=FC.queue[0];
   if(!c){
     const again=[...FC.missed];
+    if(!again.length&&FC.total>=8){S.perfect=true;checkRewards();}
     $('#introBody').innerHTML=`<h2>Sakiyo!<small>${esc(FC.deck.np)} · ${esc(FC.deck.en)}</small></h2>
      <div class="sumgrid"><div><b>${FC.total}</b><span>cards</span></div><div><b>${FC.total-again.length}</b><span>knew first time</span></div><div><b>${again.length}</b><span>needed again</span></div></div>
      <p class="goal-line" role="status">${goalLine()}</p>
@@ -2604,7 +2629,11 @@ function goHome(){
   const nb=nextBuy();
   if(nb&&nb.can)sug.push({icon:'🛍️',t:`You can buy: ${nb.it.en}`,s:`${fmt(nb.it.price)} in the Bazaar · you have ${fmt(S.rupees)}`,go:()=>openShop()});
   const en=EN();
-  const due=dueWords().length,week=weekDots();
+  const due=dueWords().length,week=weekDots(),lv0=levelInfo();
+  const nm=en?null:nextMilestone();
+  if(nm)sug.unshift({icon:nm.m.icon,t:`Next milestone: ${nm.m.en}`,s:`${nm.p.have} of ${nm.p.need} words solid`,go:()=>openRewards()});
+  const wk=weekStats(),wkKey=addDays(today(),-new Date().getDay());
+  if([0,6].includes(new Date().getDay())&&wk.mins>0&&S.recapSeen!==wkKey)sug.unshift({icon:'📅',t:'Your week is ready',s:`${wk.mins} min · ${wk.goalDays} day${wk.goalDays===1?'':'s'} at your goal`,go:()=>{S.recapSeen=wkKey;save();openRewards();}});
   const li=LIPI.findIndex((_,i)=>!(((S.lipi||{best:{}}).best[i]||0)>=80));
   if(li>=0&&!en)sug.push({icon:'अ',t:`Lipi lesson ${li+1}: ${LIPI[li].np}`,s:LIPI[li].title,go:()=>openLipiLesson(li)});
   const gi=GRAMMAR.findIndex(g=>!((((S.gram||{}).best||{})[g.id]||0)>=80));
@@ -2630,8 +2659,8 @@ function goHome(){
    <button class="hmain" id="hStall" type="button"><span class="hm-ic" aria-hidden="true">🍵</span><span><b>${en?'Open the tea stall':'Pasal kholnus'}</b><small>${en?`<span lang="ne">पसल खोल्नुस्</span> · Day ${S.day}`:`Open the tea stall · Day ${S.day}`}</small></span><span class="hm-go" aria-hidden="true">→</span></button>
    ${due?`<button class="hmain hrev" id="hReview" type="button"><span class="hm-ic" aria-hidden="true">🔁</span><span><b>${en?'Review':'Dohoryaunus'}</b><small>${due} word${due===1?'':'s'} due today · flashcards</small></span><span class="hm-go" aria-hidden="true">→</span></button>`:''}
    ${sug.length?`<h2 class="hsub">Aaja ko lagi <small>suggested for today</small></h2><section class="hsug">${sug.slice(0,3).map((x,i)=>`<button type="button" data-s="${i}"><span class="hc-ic" aria-hidden="true">${x.icon}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></button>`).join('')}</section>`:''}   <section class="hgrid">
-     ${(en?[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Practice','Practice rounds'],['hCards','🃏','Flashcards','English phrases and words'],['hSet','⚙️','Settings','Voice, answers, app']]
-       :[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Abhyas','Practice rounds'],['hCards','🃏','Patti','Flashcards'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script'],['hBook','📖','Shabdakosh','Your dictionary'],['hSet','⚙️','Settings','Voice, answers, app']])
+     ${(en?[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Practice','Practice rounds'],['hCards','🃏','Flashcards','English phrases and words'],['hRew','🏅','Rewards','Level '+lv0.n+' · badges'],['hSet','⚙️','Settings','Voice, answers, app']]
+       :[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Abhyas','Practice rounds'],['hCards','🃏','Patti','Flashcards'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script'],['hBook','📖','Shabdakosh','Your dictionary'],['hRew','🏅','Rewards','Level '+lv0.n+' · badges'],['hSet','⚙️','Settings','Voice, answers, app']])
        .map(([id,ic,np,en])=>`<button class="hcard" id="${id}" type="button"><span class="hc-ic" aria-hidden="true">${ic}</span><b>${np}</b><small>${en}</small></button>`).join('')}
    </section>
    <section class="hstats">
@@ -2650,6 +2679,7 @@ function goHome(){
   $('#hShop').onclick=()=>openShop();
   $('#hPrac').onclick=openPractice;$('#hCards').onclick=openCards;
   if(!en){$('#hGram').onclick=openGrammar;$('#hLipi').onclick=openLipiIntro;$('#hBook').onclick=()=>{renderBook();show('#ovBook');};}
+  $('#hRew').onclick=openRewards;
   $('#hSet').onclick=()=>$('#btnSet').click();
   $('#btnBook').hidden=en;
   $('#home').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>sug[+b.dataset.s].go());
@@ -2920,6 +2950,100 @@ $('#closeSet').onclick=()=>{
   document.querySelectorAll('.opt .en').forEach(e=>{if(S.settings.english)e.hidden=false;});
 };
 let resetArm=false;
+// ---------- rewards: milestones, badges, levels and the weekly recap ----------
+// A milestone is something a learner can do in real life ("order tea and a snack"). It is earned once 80% of its words are solid
+// (mastery 3 or more, i.e. answered right without hints several times), and once earned it stays earned even if a word is forgotten.
+const MILESTONES=[
+ {id:'greet',icon:'👋',en:'Greet someone politely',words:['namaste','dhanyabaad','aaunuhola','aaunus','basnus','shubha','ratri','dhog']},
+ {id:'order',icon:'🍵',en:'Order tea and a snack',words:['chiya','dudh','paani','samosa','cup','gilas','ek','dui','tin','dinus','malai','chahiyo']},
+ {id:'price',icon:'💰',en:'Ask the price and understand it',words:['kati','rupiya','das','bis','tis','chalis','pachas','saya','mahango','sasto']},
+ {id:'intro',icon:'🙋',en:'Introduce yourself',words:['naam','mero','ke','ho','chhu','tapai','sanchai','bolchhu','sikdai','nepali'].filter(w=>w!=='nepali')},
+ {id:'family',icon:'👪',en:'Talk about your family',words:['pariwar','aama','buwa','dai','didi','bhai','bahini','hajuraama','hajurbuwa','srimati']},
+ {id:'eat',icon:'🍛',en:'Invite someone to eat',words:['khana','khanubhayo','khaye','khanus','khaun','pugyo','aru','bhok','mitho','bhaat','dal']},
+ {id:'weather',icon:'🌦️',en:'Chat about the weather',words:['mausam','ghaam','badal','hiu','jaado','garmi','hawa','kuhiro','pardai']},
+ {id:'taxi',icon:'🚕',en:'Take a taxi',words:['taxi','meter','sidha','daayaa','baayaa','roknus','najik','tadha','yahaa','chalaunus','pugnu']},
+ {id:'time',icon:'🕒',en:'Say the day and the time',words:['baje','bajyo','aaitabar','sombar','mangalbar','budhabar','bihibar','shukrabar','shanibar','dedh','adhai','saadhe','aaja','bholi','hijo']},
+ {id:'health',icon:'🩺',en:'Say you are unwell',words:['jwaro','dukhchha','taauko','aushadhi','biraami','thakeko']},
+ {id:'feel',icon:'😊',en:'Say how you feel',words:['khusi','dukhi','risaayeko','darayeko','thakeko','majja','chinta','laaj']},
+ {id:'festival',icon:'🪔',en:'Join in a festival',words:['dashain','tihar','tika','shubhakamana','deusi','rangoli','teej','mala']},
+ {id:'phone',icon:'📞',en:'Make a phone call',words:['hello','phone','ghar','baje','aaunuhunchha','bhetaun','aawaj','bujhina']},
+ {id:'past',icon:'⏪',en:'Talk about the past and the future',words:['maile','timile','khayo','gayo','gaye','aaye','gare','jaanechhu','aaunechhu','garnechhu']},
+ {id:'lost',icon:'🆘',en:'Say you do not understand',words:['bujhina','bujhdina','bujhe','bhannus','bistarai','pheri','thaha','chaina']},
+];
+const solidCount=wordsKnown;
+const msProg=m=>({have:m.words.filter(w=>lvl(w)>=3).length,need:Math.ceil(m.words.length*.8),total:m.words.length});
+const msEarned=()=>MILESTONES.filter(m=>S.ms&&S.ms[m.id]).length;
+// the unfinished milestone that is closest to done
+function nextMilestone(){
+  // closeness counts partly-learned words too (mastery 1 or 2 is a third or two thirds of the way to solid)
+  const near=m=>m.words.reduce((a,w)=>a+Math.min(lvl(w),3),0)/(3*m.words.length);
+  const todo=MILESTONES.filter(m=>!(S.ms&&S.ms[m.id])).map(m=>({m,p:msProg(m),c:near(m)}));
+  todo.sort((a,b)=>b.c-a.c);
+  return todo[0]||null;
+}
+const LEVELS=[[0,'Guest'],[10,'New customer'],[25,'Regular'],[50,'Helper'],[100,'Cook'],[175,'Shopkeeper'],[275,'Manager'],[400,'Owner'],[550,'Tea master']];
+function levelInfo(){
+  const n=solidCount();let i=0;while(i+1<LEVELS.length&&n>=LEVELS[i+1][0])i++;
+  const nxt=LEVELS[i+1];
+  return {i,n:i+1,name:LEVELS[i][1],words:n,next:nxt?nxt[0]:null,nextName:nxt?nxt[1]:null,pct:nxt?Math.round(100*(n-LEVELS[i][0])/(nxt[0]-LEVELS[i][0])):100};
+}
+const BADGES=[
+ {id:'first',icon:'🌱',name:'First answer',how:'Answer your first question',test:()=>(S.stats&&S.stats.answers)>=1},
+ {id:'a100',icon:'💯',name:'Hundred answers',how:'Answer 100 questions',test:()=>(S.stats&&S.stats.answers)>=100},
+ {id:'a500',icon:'🔥',name:'Five hundred answers',how:'Answer 500 questions',test:()=>(S.stats&&S.stats.answers)>=500},
+ {id:'a2000',icon:'🏔️',name:'Two thousand answers',how:'Answer 2,000 questions',test:()=>(S.stats&&S.stats.answers)>=2000},
+ {id:'g1',icon:'🎯',name:'Goal reached',how:'Reach your daily goal once',test:()=>(S.goalDays||0)>=1},
+ {id:'g7',icon:'📆',name:'Seven goal days',how:'Reach your goal on 7 days (any days)',test:()=>(S.goalDays||0)>=7},
+ {id:'g30',icon:'🗓️',name:'Thirty goal days',how:'Reach your goal on 30 days',test:()=>(S.goalDays||0)>=30},
+ {id:'wk5',icon:'⭐',name:'Steady week',how:'Reach your goal on 5 of the last 7 days',test:()=>weekDots().n>=5},
+ {id:'w25',icon:'📗',name:'25 solid words',how:'Get 25 words solid',test:()=>solidCount()>=25},
+ {id:'w100',icon:'📘',name:'100 solid words',how:'Get 100 words solid',test:()=>solidCount()>=100},
+ {id:'w250',icon:'📚',name:'250 solid words',how:'Get 250 words solid',test:()=>solidCount()>=250},
+ {id:'m3',icon:'🏅',name:'Three milestones',how:'Earn 3 milestones',test:()=>msEarned()>=3},
+ {id:'mall',icon:'🏆',name:'Every milestone',how:'Earn every milestone',test:()=>msEarned()>=MILESTONES.length},
+ {id:'perfect',icon:'✨',name:'Flawless round',how:'Finish a flashcard round of 8 or more with none missed',test:()=>!!S.perfect},
+ {id:'lipi',icon:'अ',name:'Script reader',how:'Finish every Lipi lesson',test:()=>!EN()&&LIPI.every((_,i)=>(((S.lipi||{best:{}}).best[i]||0)>=80))},
+ {id:'gram',icon:'📖',name:'Grammar finished',how:'Finish every grammar lesson',test:()=>!EN()&&GRAMMAR.every(g=>((((S.gram||{}).best||{})[g.id]||0)>=80))},
+];
+function checkRewards(){
+  S.ms=S.ms||{};S.badges=S.badges||{};S.solid=S.solid||{};
+  const t=today(),firstRun=S.lv===undefined,got=[];
+  // words already solid before this was tracked get no date, so they don't count as this week's
+  for(const k in S.mastery)if(lvl(k)>=3&&!S.solid[k]&&DICT[k]&&DICT[k].day>0)S.solid[k]=firstRun?'0000':t;
+  if(!EN())MILESTONES.forEach(m=>{const p=msProg(m);if(!S.ms[m.id]&&p.have>=p.need){S.ms[m.id]=t;got.push(`🏅 You can now: <b>${m.en}</b>`);}});
+  BADGES.forEach(b=>{if(!S.badges[b.id]&&b.test()){S.badges[b.id]=t;got.push(`${b.icon} Badge: <b>${b.name}</b>`);}});
+  const lv=levelInfo();
+  if(!firstRun&&lv.i>S.lv)got.push(`⬆️ Level ${lv.n}: <b>${lv.name}</b>`);
+  S.lv=lv.i;
+  got.forEach(notice);
+  if(got.length)save();
+}
+function weekStats(){
+  let secs=0;for(let i=0;i<7;i++){const h=S.act&&S.act.hist[addDays(today(),-i)];if(h)secs+=h.s;}
+  const since=addDays(today(),-6);
+  return {mins:Math.round(secs/60),goalDays:weekDots().n,newSolid:Object.values(S.solid||{}).filter(d=>d>=since).length};
+}
+function openRewards(){
+  checkRewards();
+  const lv=levelInfo(),wk=weekStats(),en=EN(),nm=en?null:nextMilestone();
+  const ms=en?'':`<h3>Milestones <small>things you can do in real life</small></h3><ul class="ms-list">${MILESTONES.map(m=>{
+    const p=msProg(m),d=S.ms&&S.ms[m.id];
+    const left=m.words.filter(w=>lvl(w)<3).slice(0,4).map(w=>DICT[w].t).join(', ');
+    return `<li class="ms${d?' got':''}"><span class="ms-ic" aria-hidden="true">${d?'✅':m.icon}</span><span><b>${m.en}</b>${d?`<small>Earned ${niceDate(d)}</small>`
+      :`<small>${Math.min(p.have,p.need)} of ${p.need} words solid${left?` · still to learn: ${esc(left)}`:''}</small><span class="bar" aria-hidden="true"><i style="width:${Math.round(100*Math.min(1,p.have/p.need))}%"></i></span>`}</span></li>`;}).join('')}</ul>`;
+  $('#rewBody').innerHTML=`<h2>Rewards<small>level, milestones and badges</small></h2>
+   <div class="lvl"><b>Level ${lv.n}: ${lv.name}</b><span class="bar" aria-hidden="true"><i style="width:${lv.pct}%"></i></span>
+     <small class="recap">${lv.next!==null?`${lv.words} solid words · ${lv.next-lv.words} more to reach ${lv.nextName}`:`${lv.words} solid words · top level`}. A word is solid once you have answered it right, without hints, a few times.</small></div>
+   <h3>Your week <small>last 7 days</small></h3>
+   <div class="sumgrid"><div><b>${wk.mins}</b><span>minutes</span></div><div><b>${wk.goalDays}</b><span>days at your goal</span></div><div><b>${wk.newSolid}</b><span>words became solid</span></div></div>
+   ${nm?`<p class="recap">Closest milestone: <b>${nm.m.en}</b> (${Math.min(nm.p.have,nm.p.need)} of ${nm.p.need} words).</p>`:''}
+   ${ms}
+   <h3>Badges <small>${Object.keys(S.badges||{}).length} of ${BADGES.length}</small></h3>
+   <div class="badges">${BADGES.map(b=>{const d=S.badges&&S.badges[b.id];return `<div class="badge${d?' got':''}"><span class="bi" aria-hidden="true">${b.icon}</span><b>${b.name}</b><small>${d?'Earned '+niceDate(d):b.how}</small></div>`;}).join('')}</div>
+   <div class="row-end"><button class="primary" id="rewClose" type="button">Done</button></div>`;
+  show('#ovRew');$('#rewClose').onclick=()=>{hide('#ovRew');if(!$('#home').hidden)goHome();};$('#rewClose').focus();
+}
+
 // ---------- backup and restore ----------
 // Everything is saved in this browser, so a backup file is the safety net: every player, their progress, and the theme.
 // Restoring replaces what is on this device; the progress it replaces is kept first, so a restore can be undone.
