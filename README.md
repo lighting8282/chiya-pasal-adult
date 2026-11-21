@@ -146,6 +146,10 @@ Spend your rupees in the **Bazaar** (from the home screen or the day summary):
 - Prices are multiples of 10 for the first three days. From day 4 some prices go up to amounts ending in 5, which teaches *pandhra* (15), *pachchis* (25), *paitis* (35) and so on. Other numbers from 11 to 99 are irregular in Nepali and aren't used at the stall.
 - Romanized Nepali spelling varies between sources. The game uses common forms such as *dhanyabaad*, *chhito* and *bhetaula*.
 
+## Look
+
+The dark theme is a warm "tea stall at dusk" (plum and charcoal, with a magenta-to-amber sky) instead of dark blue. Behind every screen, slow colour glows drift and marigold, crimson and green petals float upward. It is CSS-only, sits behind the content, and stops moving when the device asks for reduced motion.
+
 ## Windows desktop version
 
 `dist\ChiyaPasal.exe` is the same game in a small Windows program (about 340 KB, no installer). It carries the game inside itself, serves it on `127.0.0.1:47831`, and opens it in its own Microsoft Edge (or Chrome) app window with no address bar. Progress is kept in `%LOCALAPPDATA%\ChiyaPasal`, separate from the website's, so use **Save a backup** on one and **Restore from a file** on the other to move progress between them. It closes itself about two minutes after the window is closed.

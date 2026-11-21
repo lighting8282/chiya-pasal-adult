@@ -38,29 +38,31 @@ try{const t=localStorage.getItem('chiya-pasal-theme');if(t==='light'||t==='dark'
   --f-body:'Mukta',system-ui,-apple-system,'Segoe UI',sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#10141d; --surface:#1b2131; --surface-2:#232b3e; --ink:#e8ecf3; --muted:#9ba5b8; --line:#323b50;
+  --bg:#1b1217; --surface:#2a1e25; --surface-2:#35272f; --ink:#f6eee9; --muted:#c4adaa; --line:#4d3a43;
   --crimson:#ff5671; --on-crimson:#22030a; --blue:#9db7ff;
-  --sky-top:#141b33; --sky-bot:#2b3352; --mount:#36425f; --mount-2:#2a3450; --snow:#c6d0e3;
+  --sky-top:#3b1d3a; --sky-bot:#b4553f; --mount:#5b3a58; --mount-2:#46304a; --snow:#f0d9cf;
   --wood:#4a2d1d; --wood-hi:#6d4530; --counter:#2f2620;
   --board:#1d2b25; --chalk:#ebe8de; --chalk-dim:#98a598;
-  --good:#5fd394; --good-bg:#15342a; --bad:#ff6b80; --bad-bg:#3a1820;
+  --good:#5fd394; --good-bg:#17382b; --bad:#ff6b80; --bad-bg:#40202a;
   --cup:#ece7df; --glass:rgba(170,205,230,.45); --stroke:#1a120d;
-  --scrim:rgba(0,0,0,.65);
+  --scrim:rgba(10,0,6,.65);
   --rain:#9cc0ea; --snowfall:#eef3fb; --windline:rgba(220,230,245,.38); --fog:rgba(120,132,155,.88); --frost:rgba(200,222,245,.6);
   --flag1:#5b7fd0; --flag2:#d9dde6; --flag3:#e0475f; --flag4:#46a866; --flag5:#e2bd45;
+  --glow:.3;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
-  --bg:#10141d; --surface:#1b2131; --surface-2:#232b3e; --ink:#e8ecf3; --muted:#9ba5b8; --line:#323b50;
+  --bg:#1b1217; --surface:#2a1e25; --surface-2:#35272f; --ink:#f6eee9; --muted:#c4adaa; --line:#4d3a43;
   --crimson:#ff5671; --on-crimson:#22030a; --blue:#9db7ff;
-  --sky-top:#141b33; --sky-bot:#2b3352; --mount:#36425f; --mount-2:#2a3450; --snow:#c6d0e3;
+  --sky-top:#3b1d3a; --sky-bot:#b4553f; --mount:#5b3a58; --mount-2:#46304a; --snow:#f0d9cf;
   --wood:#4a2d1d; --wood-hi:#6d4530; --counter:#2f2620;
   --board:#1d2b25; --chalk:#ebe8de; --chalk-dim:#98a598;
-  --good:#5fd394; --good-bg:#15342a; --bad:#ff6b80; --bad-bg:#3a1820;
+  --good:#5fd394; --good-bg:#17382b; --bad:#ff6b80; --bad-bg:#40202a;
   --cup:#ece7df; --glass:rgba(170,205,230,.45); --stroke:#1a120d;
-  --scrim:rgba(0,0,0,.65);
+  --scrim:rgba(10,0,6,.65);
   --rain:#9cc0ea; --snowfall:#eef3fb; --windline:rgba(220,230,245,.38); --fog:rgba(120,132,155,.88); --frost:rgba(200,222,245,.6);
   --flag1:#5b7fd0; --flag2:#d9dde6; --flag3:#e0475f; --flag4:#46a866; --flag5:#e2bd45;
+  --glow:.3;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -70,9 +72,19 @@ html,body{height:100%}
 html[data-text="l"]{font-size:118%}
 html[data-text="xl"]{font-size:137%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1rem;line-height:1.45}
+/* living background: slow colour glows and drifting marigold petals; still when the device asks for less motion */
+#bgLive{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#bgLive .gl{position:absolute;width:62vmax;height:62vmax;border-radius:50%;filter:blur(90px);opacity:var(--glow,.16);animation:glDrift 38s ease-in-out infinite alternate}
+#bgLive .g1{background:var(--crimson);left:-18vmax;top:-20vmax}
+#bgLive .g2{background:#f5a524;right:-22vmax;top:24vh;animation-duration:46s;animation-delay:-12s;opacity:calc(var(--glow,.16)*.75)}
+#bgLive .g3{background:#8e5be8;left:12vw;bottom:-34vmax;animation-duration:52s;animation-delay:-24s;opacity:calc(var(--glow,.16)*.7)}
+@keyframes glDrift{from{transform:translate(0,0) scale(1)}to{transform:translate(9vw,7vh) scale(1.18)}}
+#bgLive .pt{position:absolute;bottom:-24px;width:9px;height:13px;border-radius:60% 0 60% 0;opacity:0;animation:ptRise linear infinite}
+@keyframes ptRise{0%{opacity:0;transform:translate(0,0) rotate(0)}10%{opacity:.55}85%{opacity:.4}100%{opacity:0;transform:translate(var(--dx,40px),-112vh) rotate(420deg)}}
+@media (prefers-reduced-motion:reduce){#bgLive .gl,#bgLive .pt{animation:none}#bgLive .pt{display:none}}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
-.app{max-width:1000px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 28px;display:flex;flex-direction:column;gap:12px}
+.app{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 28px;display:flex;flex-direction:column;gap:12px}
 
 /* header */
 .top{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}
@@ -525,6 +537,7 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 </style>
 </head>
 <body>
+<div id="bgLive" aria-hidden="true"><i class="gl g1"></i><i class="gl g2"></i><i class="gl g3"></i></div>
 
 <div class="app">
   <header class="top">
@@ -2278,6 +2291,11 @@ function setWeather(w){
   if(wxNow)$('#wxCap').textContent='Outside: '+WEATHER[wxNow].en;
   startParticles();
 }
+// drifting petals in the background (marigold, crimson, white, green), each with its own speed and start time
+(function(){const box=document.getElementById('bgLive');if(!box)return;const cols=['#f5a524','#ff6b80','#ffd9a0','#f5a524','#7bd89c'];
+  for(let i=0;i<16;i++){const p=document.createElement('i');p.className='pt';
+    p.style.cssText=`left:${Math.round(Math.random()*100)}%;background:${cols[i%cols.length]};animation-duration:${22+Math.random()*26|0}s;animation-delay:-${Math.random()*40|0}s;--dx:${(Math.random()*160-80)|0}px;width:${7+Math.random()*7|0}px;height:${10+Math.random()*8|0}px`;
+    box.append(p);}})();
 function startParticles(){
   cancelAnimationFrame(wxRaf);
   const kind=wxNow==='paani'?'rain':wxNow==='hiu'?'snow':wxNow==='hawa'?'wind':null;
