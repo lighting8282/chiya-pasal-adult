@@ -100,7 +100,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-o
 .who-chip{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 12px 2px 2px;font-weight:700;max-width:180px}
 .who-chip span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* home */
-.home{display:flex;flex-direction:column;gap:14px}
+.home{display:flex;flex-direction:column;gap:12px}
 .hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(var(--sky-top),var(--sky-bot));border:8px solid var(--wood);border-radius:14px;padding:16px}
 .hero-t{flex:1 1 220px;min-width:0}
 .hero h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:1.9rem;line-height:1.15;color:var(--ink);text-wrap:balance}
@@ -114,6 +114,27 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-o
 .hmain b{display:block;font-family:var(--f-display);font-weight:400;font-size:1.6rem;line-height:1.1}
 .hmain small{opacity:.9}
 .hmain .hm-go{margin-left:auto;font-size:1.8rem}
+.hello{display:flex;align-items:center;gap:12px}
+.hello-t{flex:1;min-width:0}
+.hello h1{margin:0;font-family:var(--f-display);font-weight:400;font-size:1.6rem;line-height:1.15}
+.hello small{color:var(--muted);font-size:.92rem}
+body[data-mode="home"] .top nav{display:none}
+.today .hmain{grid-column:1/-1}
+.today-alt{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.today-alt button{display:flex;align-items:baseline;justify-content:center;gap:8px;padding:10px;font-weight:700;border-radius:12px}
+.today-alt small{font-weight:400;color:var(--muted)}
+.hnext{display:flex;align-items:center;gap:12px;text-align:left;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+.hnext b{display:block}
+.hnext small{display:block;color:var(--muted);font-size:.85rem}
+.hnext .hm-go{margin-left:auto;font-size:1.4rem;color:var(--muted)}
+.hcat h2{margin:4px 0 6px;font-size:1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.hcat h2 small{text-transform:none;letter-spacing:0;font-weight:400;margin-left:4px}
+.hrow{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+@media (max-width:620px){.hello h1{font-size:1.25rem}.hello .pav.mid{width:48px;height:48px;font-size:1.5rem}.hello small{font-size:.85rem}
+  .hrow .hcard{padding:8px 10px;gap:8px}.hrow .hcard .hc-ic{font-size:1.3rem;width:1.5rem}.today .ring{width:64px;height:64px}}
+.hrow .hcard{flex-direction:row;align-items:center;gap:10px;padding:10px 12px}
+.hrow .hcard .hc-ic{font-size:1.5rem;width:1.8rem;text-align:center}
+.hrow .hcard b,.hrow .hcard small{display:block}
 .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
 .hcard{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
 .hcard:hover,.hsug button:hover{border-color:var(--muted)}
@@ -626,6 +647,9 @@ body[data-mode="weather"] .work,body[data-mode="family"] .work,body[data-mode="w
 <div class="overlay" id="ovRew" hidden><div class="sheet" id="rewBody"></div></div>
 <div class="overlay" id="ovSet" hidden><div class="sheet">
   <h2>Settings</h2>
+  <div class="set-speed set-theme"><b>Daily goal</b>
+    <div class="speeds" id="goals" role="radiogroup" aria-label="Daily goal"></div>
+  </div>
   <div class="set-speed set-theme"><b>Text size</b>
     <div class="speeds" id="sizes" role="radiogroup" aria-label="Text size"></div>
   </div>
@@ -2636,12 +2660,11 @@ function showGame(){$('#home').hidden=true;$('#game').hidden=false;}
 function wordsKnown(){return VOCAB.filter(v=>v[3]>0&&lvl(v[0])>=3).length;}
 function goHome(){
   if(C){C.gone=true;C.lock=true;}
-  G=null;FC=null;['#ovIntro','#ovSum','#ovBook'].forEach(hide);$('#cont').hidden=true;
+  G=null;FC=null;['#ovIntro','#ovSum','#ovBook','#ovRew'].forEach(hide);$('#cont').hidden=true;
   if(TTS)speechSynthesis.cancel();
   $('#game').hidden=true;$('#home').hidden=false;document.body.dataset.mode='home';
   renderTop();
   const p=curProf(),streak=S.streak&&S.streak.n&&[today(),addDays(today(),-1)].includes(S.streak.last)?S.streak.n:0;
-  const lipiDone=LIPI.filter((_,i)=>((S.lipi||{best:{}}).best[i]||0)>=80).length,gramDone=GRAMMAR.filter(g=>(((S.gram||{}).best||{})[g.id]||0)>=80).length;
   // suggestions: the next step in each path, plus weak words
   const sug=[];
   const nb=nextBuy();
@@ -2662,37 +2685,31 @@ function goHome(){
   if(untried)sug.push({icon:untried.icon,t:`Try ${en?untried.en:untried.np}`,s:en?EN_ABOUT[untried.key]||untried.about:untried.en+'. '+untried.about,go:untried.open});
   if(backupDue())sug.unshift({icon:'💾',t:'Save a backup of your progress',s:PR.backup&&PR.backup.last?`Your last backup was ${daysAgo(PR.backup.last)}`:'Your progress lives only in this browser',go:()=>{$('#btnSet').click();setTimeout(()=>$('#backupBox').scrollIntoView({block:'center'}),60);}});
   const greet=new Date().getHours()<12?['Shubha prabhat','Good morning']:new Date().getHours()<18?['Namaste','Hello']:['Shubha sandhya','Good evening'];
+  // the home screen: who you are, today's goal with the main things to do, one suggestion, then everything else in three groups
+  const cats=[
+    {np:'Sikne',en:'Learn',items:en?[['hPrac','🧭','Practice','Practice rounds']]
+      :[['hPrac','🧭','Abhyas','Practice rounds'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script']]},
+    {np:'Dohoryaune',en:'Review',items:en?[['hCards','🃏','Flashcards','Phrases and words']]
+      :[['hCards','🃏','Patti','Flashcards'],['hBook','📖','Shabdakosh','Your dictionary']]},
+    {np:'Tapaiko',en:'You',items:[['hRew','🏅','Rewards','Level '+lv0.n+' · '+lv0.name],['hShop','🛍️','Bazaar','Spend your rupees'],['hSet','⚙️','Settings','Voice, goal, backup']]}];
+  const top=sug[0];
   $('#home').innerHTML=`
-   <section class="hero">${avatarHtml(p,'big')}
-     <div class="hero-t"><h1>${greet[0]}, ${esc(p.name)}!<small>${greet[1]} · ${streak?`🔥 ${streak} day${streak===1?'':'s'} in a row`:en?'Ready for some English?':'Ready for some Nepali?'}</small></h1></div>
-     <button class="ghost" id="hWho" type="button">Change player</button></section>
-   <section class="today" aria-label="Today's goal">
+   <section class="hello">${avatarHtml(p,'mid')}
+     <div class="hello-t"><h1>${greet[0]}, ${esc(p.name)}!</h1><small>${greet[1]} · ${streak?`🔥 ${streak} day${streak===1?'':'s'} in a row`:en?'Ready for some English?':'Ready for some Nepali?'}</small></div>
+     <button class="ghost" id="hWho" type="button">Switch</button></section>
+   <section class="today" aria-label="Today">
      <div class="ring" role="img" aria-label="${goalLine()}"><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="rb" cx="22" cy="22" r="18"/><circle class="rf" cx="22" cy="22" r="18" transform="rotate(-90 22 22)" stroke-dasharray="${(Math.min(1,todaySecs()/(goalMin()*60))*113.1).toFixed(1)} 113.1"/></svg><span><b>${Math.floor(todaySecs()/60)}</b>min</span></div>
      <div class="today-t"><b>${goalLine()}</b>
-       <small>${todaySecs()>=goalMin()*60?'Keep going whenever you like.':'A little each day adds up.'}</small>
        <span class="wk" aria-label="${week.n} of the last 7 days with the goal reached">${week.html}</span></div>
-     <button class="primary" id="hQuick" type="button">⚡ ${en?'Quick session':'Chhito abhyas'}<small>10 flashcards · about 3 min</small></button>
-     <div class="goalpick" role="radiogroup" aria-label="Daily goal">Daily goal ${[5,10,20].map(m=>`<button type="button" role="radio" aria-checked="${m===goalMin()}" data-goal="${m}">${m} min</button>`).join('')}</div>
+     <button class="hmain" id="hStall" type="button"><span class="hm-ic" aria-hidden="true">🍵</span><span><b>${en?'Open the tea stall':'Pasal kholnus'}</b><small>${en?'Day':'Open the tea stall · Day'} ${S.day}</small></span><span class="hm-go" aria-hidden="true">→</span></button>
+     <div class="today-alt"><button class="ghost" id="hQuick" type="button">⚡ ${en?'Quick session':'Chhito abhyas'}<small>3 min</small></button>
+       ${due?`<button class="ghost" id="hReview" type="button">🔁 ${en?'Review':'Dohoryaunus'}<small>${due} due</small></button>`:''}</div>
    </section>
-   <button class="hmain" id="hStall" type="button"><span class="hm-ic" aria-hidden="true">🍵</span><span><b>${en?'Open the tea stall':'Pasal kholnus'}</b><small>${en?`<span lang="ne">पसल खोल्नुस्</span> · Day ${S.day}`:`Open the tea stall · Day ${S.day}`}</small></span><span class="hm-go" aria-hidden="true">→</span></button>
-   ${due?`<button class="hmain hrev" id="hReview" type="button"><span class="hm-ic" aria-hidden="true">🔁</span><span><b>${en?'Review':'Dohoryaunus'}</b><small>${due} word${due===1?'':'s'} due today · flashcards</small></span><span class="hm-go" aria-hidden="true">→</span></button>`:''}
-   ${sug.length?`<h2 class="hsub">Aaja ko lagi <small>suggested for today</small></h2><section class="hsug">${sug.slice(0,3).map((x,i)=>`<button type="button" data-s="${i}"><span class="hc-ic" aria-hidden="true">${x.icon}</span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span></button>`).join('')}</section>`:''}   <section class="hgrid">
-     ${(en?[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Practice','Practice rounds'],['hCards','🃏','Flashcards','English phrases and words'],['hRew','🏅','Rewards','Level '+lv0.n+' · badges'],['hSet','⚙️','Settings','Voice, answers, app']]
-       :[['hShop','🛍️','Bazaar','Spend your rupees'],['hPrac','🧭','Abhyas','Practice rounds'],['hCards','🃏','Patti','Flashcards'],['hGram','📘','Vyakaran','Grammar'],['hLipi','अ','Lipi','Nepali script'],['hBook','📖','Shabdakosh','Your dictionary'],['hRew','🏅','Rewards','Level '+lv0.n+' · badges'],['hSet','⚙️','Settings','Voice, answers, app']])
-       .map(([id,ic,np,en])=>`<button class="hcard" id="${id}" type="button"><span class="hc-ic" aria-hidden="true">${ic}</span><b>${np}</b><small>${en}</small></button>`).join('')}
-   </section>
-   <section class="hstats">
-     <div><b>Din ${S.day}</b><span>at the tea stall</span></div>
-     <div><b>${fmt(S.rupees)}</b><span>earned</span></div>
-     ${en?`<div><b>${practices().filter(x=>(S.practiced||{})[x.key]).length}/${practices().length}</b><span>practice rounds tried</span></div>
-     <div><b>${S.tipsTotal?fmt(S.tipsTotal):'–'}</b><span>tips earned</span></div>`
-     :`<div><b>${wordsKnown()}</b><span>words known well</span></div>
-     <div><b>${lipiDone}/${LIPI.length} · ${gramDone}/${GRAMMAR.length}</b><span>script · grammar lessons</span></div>`}
-   </section>`;
+   ${top?`<button class="hnext" type="button" data-s="0"><span class="hc-ic" aria-hidden="true">${top.icon}</span><span><small>Next up</small><b>${esc(top.t)}</b><small>${esc(top.s)}</small></span><span class="hm-go" aria-hidden="true">→</span></button>`:''}
+   ${cats.map(c=>`<section class="hcat"><h2>${c.en} <small>${c.np}</small></h2><div class="hrow">${c.items.map(([id,ic,np,sub])=>`<button class="hcard" id="${id}" type="button"><span class="hc-ic" aria-hidden="true">${ic}</span><span><b>${np}</b><small>${sub}</small></span></button>`).join('')}</div></section>`).join('')}`;
   $('#hWho').onclick=()=>openWho();
   $('#hStall').onclick=()=>startDay();
   $('#hQuick').onclick=()=>startCards(cardDecks().find(d=>d.id==='quick'),goHome);
-  $('#home').querySelectorAll('[data-goal]').forEach(b=>b.onclick=()=>{S.goal=+b.dataset.goal;save();goHome();});
   if($('#hReview'))$('#hReview').onclick=()=>startCards(cardDecks().find(d=>d.id==='due'),goHome);
   $('#hShop').onclick=()=>openShop();
   $('#hPrac').onclick=openPractice;$('#hCards').onclick=openCards;
@@ -2962,6 +2979,7 @@ $('#closeSet').onclick=()=>{
   S.settings.relaxed=$('#optRelaxed').checked;S.settings.english=$('#optEnglish').checked;
   S.settings.typing=$('#optType').checked;S.settings.listen=$('#optListen').checked;S.settings.mic=$('#optMic').checked;S.settings.devanagari=$('#optDev').checked;
   save();hide('#ovSet');
+  if(!$('#home').hidden)goHome();
   if(C&&!C.lock&&!C.gone){const st=C.steps[C.i];renderBubble(st.say,st.en,st.show);renderInputs(st);}
   renderMenu();$('#sayEn').hidden=!S.settings.english;setWeather(wxNow);
   const v=voiceOn();$('#sayAgain').hidden=!v;$('#bubble').classList.toggle('has-voice',v);
@@ -3052,6 +3070,10 @@ function openRewards(){
   $('#rewBody').innerHTML=`<h2>Rewards<small>level, milestones and badges</small></h2>
    <div class="lvl"><b>Level ${lv.n}: ${lv.name}</b><span class="bar" aria-hidden="true"><i style="width:${lv.pct}%"></i></span>
      <small class="recap">${lv.next!==null?`${lv.words} solid words · ${lv.next-lv.words} more to reach ${lv.nextName}`:`${lv.words} solid words · top level`}. A word is solid once you have answered it right, without hints, a few times.</small></div>
+   <h3>Your stall <small>so far</small></h3>
+   <div class="sumgrid"><div><b>Din ${S.day}</b><span>at the tea stall</span></div><div><b>${fmt(S.rupees)}</b><span>rupees</span></div>
+     ${en?`<div><b>${practices().filter(x=>(S.practiced||{})[x.key]).length}/${practices().length}</b><span>practice rounds tried</span></div>`
+     :`<div><b>${LIPI.filter((_,i)=>((S.lipi||{best:{}}).best[i]||0)>=80).length}/${LIPI.length} · ${GRAMMAR.filter(g=>(((S.gram||{}).best||{})[g.id]||0)>=80).length}/${GRAMMAR.length}</b><span>script · grammar lessons</span></div>`}</div>
    <h3>Your week <small>last 7 days</small></h3>
    <div class="sumgrid"><div><b>${wk.mins}</b><span>minutes</span></div><div><b>${wk.goalDays}</b><span>days at your goal</span></div><div><b>${wk.newSolid}</b><span>words became solid</span></div></div>
    ${nm?`<p class="recap">Closest milestone: <b>${nm.m.en}</b> (${Math.min(nm.p.have,nm.p.need)} of ${nm.p.need} words).</p>`:''}
@@ -3157,7 +3179,11 @@ function renderSizes(){
     renderSizes();
   });
 }
-{const open=$('#btnSet').onclick;$('#btnSet').onclick=()=>{open();renderBackup();renderSizes();};}
+function renderGoals(){
+  $('#goals').innerHTML=[[5,'a little'],[10,'steady'],[20,'keen']].map(([m,t])=>`<button type="button" role="radio" aria-checked="${m===goalMin()}" data-g="${m}"><b>${m} min</b><small>${t}</small></button>`).join('');
+  $('#goals').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.goal=+b.dataset.g;save();renderGoals();});
+}
+{const open=$('#btnSet').onclick;$('#btnSet').onclick=()=>{open();renderBackup();renderSizes();renderGoals();};}
 
 $('#btnReset').onclick=()=>{
   if(!resetArm){resetArm=true;$('#btnReset').textContent='Tap again to erase everything';return;}

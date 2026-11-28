@@ -34,7 +34,7 @@ Family terms, festivals, Nepali grammar and the Devanagari script teach Nepali i
 
 ## Home screen and players
 
-The game opens on a home screen that greets you and shows your day at the stall, your money, how many words you know well, your progress in script and grammar, and your streak. From there you can open the stall or jump to any section, and it suggests what to do next.
+The game opens on a short home screen, top to bottom: a one-line greeting (with your streak); a **Today** card with the daily-goal ring, the week's dots, the big **Open the tea stall** button and smaller **Quick session** and **Review** buttons; one **Next up** suggestion; then everything else in three groups: **Learn** (practice rounds, grammar, script), **Review** (flashcards, dictionary) and **You** (rewards, Bazaar, settings). The header's menu buttons are hidden on the home screen since the groups cover them. The daily goal is set in Settings, and the stall totals (day, rupees, lessons finished) are on the Rewards screen.
 
 Several people can play on one device. Each player has a name, an emoji avatar or a photo, and their own progress, money, settings and streak. With more than one player, the game asks "Ko khelcha?" (who's playing?) when it opens. Photos are shrunk to a small square and stay on the device.
 
